@@ -251,3 +251,35 @@ class Favorite(Base):
     # Relaciones
     user = relationship("User", back_populates="favorites")
     content_item = relationship("ContentItem", back_populates="favorites")
+
+
+# ─── Pagos ────────────────────────────────────────────────────────────────────
+
+class PaymentStatus(str, enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+    cancelled = "cancelled"
+
+
+class PaymentPlan(str, enum.Enum):
+    monthly = "monthly"
+    yearly = "yearly"
+
+
+class Payment(Base):
+    """Registro de cada intento/pago de suscripción."""
+    __tablename__ = "payments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    mp_preference_id = Column(String(255), nullable=True)
+    mp_payment_id = Column(String(255), nullable=True)
+    mp_status = Column(String(50), nullable=True)
+    plan = Column(SAEnum(PaymentPlan), nullable=False)
+    amount = Column(Float, nullable=False)
+    status = Column(SAEnum(PaymentStatus), default=PaymentStatus.pending)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User")

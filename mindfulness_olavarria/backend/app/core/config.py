@@ -21,8 +21,8 @@ class Settings(BaseSettings):
 
     # CORS - orígenes permitidos
     ALLOWED_ORIGINS: list[str] = [
-        "http://localhost:3000",   # React dev
-        "http://localhost:5173",   # Vite dev
+        "http://localhost:3000",
+        "http://localhost:5173",
         "http://127.0.0.1:3000",
     ]
 
@@ -34,6 +34,23 @@ class Settings(BaseSettings):
     PRICE_MONTHLY_ARS: float = 2990.0
     PRICE_YEARLY_ARS: float = 24900.0
     FREE_TRIAL_DAYS: int = 7
+
+    # ─── MercadoPago ──────────────────────────────────────────────────────────
+    # Credenciales de PRUEBA (sandbox)
+    # Cuando Gabriela tenga las credenciales reales, reemplazar estos valores
+    # en el archivo .env (NO en este archivo)
+    # Obtenerlas en: mercadopago.com.ar/developers → Mis aplicaciones → Credenciales
+    MP_ACCESS_TOKEN: str = "TEST-0000000000000000-000000-00000000000000000000000000000000-000000000"
+    MP_PUBLIC_KEY: str = "TEST-00000000-0000-0000-0000-000000000000"
+
+    # URLs de retorno después del pago
+    # En producción reemplazar localhost por el dominio real
+    MP_SUCCESS_URL: str = "http://localhost:5173/suscripcion/exitosa"
+    MP_FAILURE_URL: str = "http://localhost:5173/suscripcion/fallida"
+    MP_PENDING_URL: str = "http://localhost:5173/suscripcion/pendiente"
+
+    # URL del webhook (donde MercadoPago notifica pagos confirmados)
+    MP_WEBHOOK_URL: str = "http://localhost:8000/api/v1/payments/webhook"
 
     class Config:
         env_file = ".env"
