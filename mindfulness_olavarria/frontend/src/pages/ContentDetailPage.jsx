@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { contentAPI } from '../api/api'
 import useAuthStore from '../store/authStore'
+import BreathingPlayer from '../components/BreathingPlayer'
 
 export default function ContentDetailPage() {
   const { id } = useParams()
@@ -89,7 +90,9 @@ export default function ContentDetailPage() {
           <Paywall />
         ) : item.content_type === 'audio' ? (
           <AudioPlayer item={item} />
-        ) : (item.content_type === 'exercise' || item.content_type === 'breathing' || item.content_type === 'text') ? (
+        ) : item.content_type === 'breathing' ? (
+          <BreathingPlayer techniqueKey="4-7-8" itemId={item.id} />
+        ) : (item.content_type === 'exercise' || item.content_type === 'text') ? (
           <TextContent item={item} />
         ) : (
           <p style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>Contenido no disponible</p>

@@ -138,10 +138,14 @@ export default function HomePage() {
         <div style={{ marginBottom: '20px' }}>
           <p className="section-label">Pausas rápidas</p>
           <div style={{ display: 'flex', gap: '8px' }}>
-            {['1 min', '3 min', '5 min'].map((t) => (
+            {[
+              { label: 'Respirar', icon: '💨', path: '/respiracion' },
+              { label: '3 min', icon: '⏱️', path: '/contenido' },
+              { label: '5 min', icon: '⏱️', path: '/contenido' },
+            ].map((item) => (
               <button
-                key={t}
-                onClick={() => navigate('/contenido')}
+                key={item.label}
+                onClick={() => navigate(item.path)}
                 style={{
                   flex: 1,
                   padding: '14px 8px',
@@ -157,8 +161,8 @@ export default function HomePage() {
                   gap: '6px',
                 }}
               >
-                <span style={{ fontSize: '20px' }}>⏱️</span>
-                {t}
+                <span style={{ fontSize: '20px' }}>{item.icon}</span>
+                {item.label}
               </button>
             ))}
           </div>

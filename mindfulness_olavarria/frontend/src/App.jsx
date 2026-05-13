@@ -9,6 +9,8 @@ import HomePage from './pages/HomePage'
 import ContentPage from './pages/ContentPage'
 import ContentDetailPage from './pages/ContentDetailPage'
 import ProgramsPage from './pages/ProgramsPage'
+import ProgramDetailPage from './pages/ProgramDetailPage'
+import BreathingPage from './pages/BreathingPage'
 import ProfilePage from './pages/ProfilePage'
 import PlansPage from './pages/PlansPage'
 import { PaymentSuccess, PaymentFailure, PaymentPending } from './pages/PaymentResultPages'
@@ -87,6 +89,9 @@ export default function App() {
           <Route path="contenido" element={<ContentPage />} />
           <Route path="contenido/:id" element={<ContentDetailPage />} />
           <Route path="programas" element={<ProgramsPage />} />
+          <Route path="programas/:id" element={<ProgramDetailPage />} />
+          <Route path="respiracion" element={<BreathingPage />} />
+          <Route path="respiracion/:id" element={<BreathingPage />} />
           <Route path="perfil" element={<ProfilePage />} />
         </Route>
 
