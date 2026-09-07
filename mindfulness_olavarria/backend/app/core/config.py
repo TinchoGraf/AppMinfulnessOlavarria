@@ -4,7 +4,7 @@ from typing import Optional
 
 class Settings(BaseSettings):
     # App
-    APP_NAME: str = "Mindfulness Olavarría"
+    APP_NAME: str = "Serenalma"
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = True
 

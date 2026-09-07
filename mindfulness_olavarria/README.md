@@ -1,4 +1,4 @@
-# 🌿 Mindfulness Olavarría
+# 🌿 Serenalma
 
 Plataforma de bienestar emocional de la **Psicóloga Gabriela Ithurralde**.  
 30 años de experiencia en psicología clínica y mindfulness. [@mindfulnessolavarria](https://instagram.com/mindfulnessolavarria) | [psicologaithurralde.com.ar](https://psicologaithurralde.com.ar)

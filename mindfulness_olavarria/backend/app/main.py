@@ -1,5 +1,5 @@
 """
-Mindfulness Olavarría — Backend API
+Serenalma — Backend API
 Psicóloga Gabriela Ithurralde | psicologaithurralde.com.ar
 
 Punto de entrada de la aplicación FastAPI.
@@ -26,7 +26,7 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description="""
-    API para la plataforma de Mindfulness Olavarría.
+    API para la plataforma de Serenalma.
     
     **Psicóloga Gabriela Ithurralde** — 30 años de experiencia en psicología clínica y mindfulness.
     

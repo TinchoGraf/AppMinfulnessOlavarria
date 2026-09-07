@@ -41,7 +41,7 @@ export default function LoginPage() {
             fontSize: '28px',
           }}>🌿</div>
           <h1 style={{ fontSize: '22px', fontWeight: '600', color: 'var(--text-primary)' }}>
-            Mindfulness Olavarría
+            Serenalma
           </h1>
           <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '4px' }}>
             Psicóloga Gabriela Ithurralde

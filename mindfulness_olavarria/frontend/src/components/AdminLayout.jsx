@@ -38,7 +38,7 @@ export default function AdminLayout() {
             <span style={{ fontSize: '24px' }}>🌿</span>
             <div>
               <p style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Admin Panel</p>
-              <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Mindfulness Olavarría</p>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Serenalma</p>
             </div>
           </div>
         </div>

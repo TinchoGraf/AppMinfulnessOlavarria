@@ -50,7 +50,7 @@ export function PaymentSuccess() {
             <p style={{ fontSize: '56px', marginBottom: '16px' }}>🎉</p>
             <h1 style={{ ...titleStyle, color: 'var(--green-700)' }}>¡Suscripción activada!</h1>
             <p style={subtitleStyle}>
-              Ya tenés acceso a todo el contenido de Mindfulness Olavarría.
+              Ya tenés acceso a todo el contenido de Serenalma.
             </p>
             <button className="btn-primary" style={{ marginTop: '24px', maxWidth: '240px' }} onClick={() => navigate('/')}>
               Ir al inicio 🌿

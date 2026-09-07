@@ -104,7 +104,7 @@ def create_subscription(
     sdk = get_mp_sdk()
 
     preapproval_data = {
-        "reason": f"Mindfulness Olavarría — {plan_config['label']}",
+        "reason": f"Serenalma — {plan_config['label']}",
         "external_reference": str(payment.id),
         "payer_email": current_user.email,
         # MP agrega sus propios parámetros (preapproval_id, status) a continuación de este back_url

@@ -21,7 +21,7 @@ export default function AdminDashboard() {
       <div style={{ marginBottom: '28px' }}>
         <h1 style={{ fontSize: '24px', fontWeight: '600', color: 'var(--text-primary)' }}>Dashboard</h1>
         <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-          Resumen general de Mindfulness Olavarría
+          Resumen general de Serenalma
         </p>
       </div>
 

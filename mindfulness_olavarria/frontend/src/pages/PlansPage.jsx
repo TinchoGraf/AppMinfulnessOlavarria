@@ -58,7 +58,7 @@ export default function PlansPage() {
         <p style={{ fontSize: '48px', marginBottom: '16px' }}>✨</p>
         <h1 style={{ fontSize: '22px', fontWeight: '600', marginBottom: '8px', textAlign: 'center' }}>Ya tenés acceso premium</h1>
         <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', textAlign: 'center' }}>
-          Disfrutá de todo el contenido de Mindfulness Olavarría
+          Disfrutá de todo el contenido de Serenalma
         </p>
         <button className="btn-primary" style={{ maxWidth: '240px' }} onClick={() => navigate('/')}>
           Ir al inicio

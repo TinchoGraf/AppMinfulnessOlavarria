@@ -1,5 +1,5 @@
 """
-Modelos de base de datos para Mindfulness Olavarría.
+Modelos de base de datos para Serenalma.
 
 Tablas:
   - users: Usuarios registrados
