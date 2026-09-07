@@ -40,7 +40,7 @@ export const statsAPI = {
 
 // ─── Pagos ────────────────────────────────────────────────────────────────────
 export const paymentsAPI = {
-  createPreference: (plan) => client.post('/payments/create-preference', { plan }),
+  createSubscription: (plan) => client.post('/payments/create-subscription', { plan }),
   confirm: (params) => client.get('/payments/confirm', { params }),
   myPayments: () => client.get('/payments/my-payments'),
 }

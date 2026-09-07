@@ -9,6 +9,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
+import sys
+
+# En Windows la consola puede no estar en UTF-8 (cp1252), lo que rompe
+# cualquier print() con emojis o acentos. Forzamos UTF-8 en stdout/stderr.
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
 
 from app.core.config import settings
 from app.api.v1.router import api_router

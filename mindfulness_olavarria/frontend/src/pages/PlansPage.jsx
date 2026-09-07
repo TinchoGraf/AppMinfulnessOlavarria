@@ -3,23 +3,48 @@ import { useNavigate } from 'react-router-dom'
 import { paymentsAPI } from '../api/api'
 import useAuthStore from '../store/authStore'
 
+// Valores de ejemplo — se van a definir más adelante.
+const PLANS = [
+  {
+    key: 'yearly',
+    label: 'Plan anual',
+    price: 29900,
+    periodLabel: '/año',
+    note: 'Equivale a $2.492/mes — 2 meses gratis',
+    badge: 'MEJOR VALOR',
+    highlight: true,
+  },
+  {
+    key: 'quarterly',
+    label: 'Plan trimestral',
+    price: 7990,
+    periodLabel: '/trimestre',
+    note: 'Equivale a $2.663/mes',
+    highlight: false,
+  },
+  {
+    key: 'monthly',
+    label: 'Plan mensual',
+    price: 2990,
+    periodLabel: '/mes',
+    note: 'Cancelá cuando quieras',
+    highlight: false,
+  },
+]
+
 export default function PlansPage() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
-  const [loading, setLoading] = useState(null) // 'monthly' | 'yearly'
+  const [loading, setLoading] = useState(null) // 'monthly' | 'quarterly' | 'yearly'
   const [error, setError] = useState(null)
 
   const handleSubscribe = async (plan) => {
     setLoading(plan)
     setError(null)
     try {
-      const res = await paymentsAPI.createPreference(plan)
-      const { sandbox_url, checkout_url } = res.data
-
-      // En desarrollo usamos sandbox_url, en producción checkout_url
-      // Cuando tengas las credenciales reales, cambiar a checkout_url
-      const url = sandbox_url || checkout_url
-      window.location.href = url
+      const res = await paymentsAPI.createSubscription(plan)
+      const { checkout_url } = res.data
+      window.location.href = checkout_url
 
     } catch (err) {
       setError('No se pudo conectar con MercadoPago. Verificá las credenciales.')
@@ -81,71 +106,74 @@ export default function PlansPage() {
           </div>
         )}
 
-        {/* Plan anual — destacado */}
-        <div style={{
-          background: 'var(--green-500)',
-          borderRadius: '16px',
-          padding: '24px',
-          marginBottom: '12px',
-          position: 'relative',
-          overflow: 'hidden',
-        }}>
-          <div style={{
-            position: 'absolute', top: '12px', right: '12px',
-            background: '#FFD700', color: '#333', fontSize: '11px',
-            fontWeight: '700', padding: '4px 10px', borderRadius: '20px',
-          }}>
-            MEJOR VALOR
-          </div>
-          <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px', marginBottom: '4px' }}>Plan anual</p>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px' }}>
-            <p style={{ color: 'white', fontSize: '32px', fontWeight: '700' }}>$24.900</p>
-            <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '14px' }}>/año</p>
-          </div>
-          <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px', marginBottom: '20px' }}>
-            Equivale a $2.075/mes — ahorrás $9.000 al año
-          </p>
-          <button
-            onClick={() => handleSubscribe('yearly')}
-            disabled={loading !== null}
-            style={{
-              width: '100%', padding: '14px',
-              background: 'white', color: 'var(--green-700)',
-              border: 'none', borderRadius: '10px',
-              fontSize: '15px', fontWeight: '600', cursor: 'pointer',
-            }}
+        {/* Planes */}
+        {PLANS.map((plan) => (
+          <div
+            key={plan.key}
+            style={
+              plan.highlight
+                ? {
+                    background: 'var(--green-500)',
+                    borderRadius: '16px',
+                    padding: '24px',
+                    marginBottom: '12px',
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }
+                : {
+                    background: 'white',
+                    borderRadius: '16px',
+                    padding: '24px',
+                    marginBottom: '12px',
+                    border: '0.5px solid var(--border)',
+                  }
+            }
           >
-            {loading === 'yearly' ? 'Redirigiendo...' : 'Suscribirme anual'}
-          </button>
-        </div>
-
-        {/* Plan mensual */}
-        <div style={{
-          background: 'white',
-          borderRadius: '16px',
-          padding: '24px',
-          marginBottom: '20px',
-          border: '0.5px solid var(--border)',
-        }}>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '4px' }}>Plan mensual</p>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px' }}>
-            <p style={{ fontSize: '32px', fontWeight: '700' }}>$2.990</p>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>/mes</p>
+            {plan.badge && (
+              <div style={{
+                position: 'absolute', top: '12px', right: '12px',
+                background: '#FFD700', color: '#333', fontSize: '11px',
+                fontWeight: '700', padding: '4px 10px', borderRadius: '20px',
+              }}>
+                {plan.badge}
+              </div>
+            )}
+            <p style={{ color: plan.highlight ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)', fontSize: '13px', marginBottom: '4px' }}>
+              {plan.label}
+            </p>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px' }}>
+              <p style={{ color: plan.highlight ? 'white' : 'var(--text-primary)', fontSize: '32px', fontWeight: '700' }}>
+                ${plan.price.toLocaleString('es-AR')}
+              </p>
+              <p style={{ color: plan.highlight ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)', fontSize: '14px' }}>
+                {plan.periodLabel}
+              </p>
+            </div>
+            <p style={{ color: plan.highlight ? 'rgba(255,255,255,0.8)' : 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>
+              {plan.note}
+            </p>
+            <button
+              onClick={() => handleSubscribe(plan.key)}
+              disabled={loading !== null}
+              className={plan.highlight ? undefined : 'btn-outline'}
+              style={
+                plan.highlight
+                  ? {
+                      width: '100%', padding: '14px',
+                      background: 'white', color: 'var(--green-700)',
+                      border: 'none', borderRadius: '10px',
+                      fontSize: '15px', fontWeight: '600', cursor: 'pointer',
+                    }
+                  : undefined
+              }
+            >
+              {loading === plan.key ? 'Redirigiendo...' : `Suscribirme ${plan.key === 'monthly' ? 'mensual' : plan.key === 'quarterly' ? 'trimestral' : 'anual'}`}
+            </button>
           </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '20px' }}>
-            Cancelá cuando quieras
-          </p>
-          <button
-            onClick={() => handleSubscribe('monthly')}
-            disabled={loading !== null}
-            className="btn-outline"
-          >
-            {loading === 'monthly' ? 'Redirigiendo...' : 'Suscribirme mensual'}
-          </button>
-        </div>
+        ))}
 
-        <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.6' }}>
-          Pago seguro con MercadoPago · Sin renovación automática sorpresiva
+        <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.6', marginTop: '8px' }}>
+          Pago seguro con MercadoPago · Suscripción con débito automático recurrente, cancelable cuando quieras
         </p>
       </div>
     </div>

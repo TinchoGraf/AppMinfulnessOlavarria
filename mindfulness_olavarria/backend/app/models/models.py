@@ -33,6 +33,7 @@ class UserRole(str, enum.Enum):
 class SubscriptionPlan(str, enum.Enum):
     free = "free"
     monthly = "monthly"
+    quarterly = "quarterly"
     yearly = "yearly"
 
 
@@ -264,6 +265,7 @@ class PaymentStatus(str, enum.Enum):
 
 class PaymentPlan(str, enum.Enum):
     monthly = "monthly"
+    quarterly = "quarterly"
     yearly = "yearly"
 
 
@@ -273,7 +275,7 @@ class Payment(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    mp_preference_id = Column(String(255), nullable=True)
+    mp_preapproval_id = Column(String(255), nullable=True)  # ID de la suscripcion (Preapproval) en MP
     mp_payment_id = Column(String(255), nullable=True)
     mp_status = Column(String(50), nullable=True)
     plan = Column(SAEnum(PaymentPlan), nullable=False)

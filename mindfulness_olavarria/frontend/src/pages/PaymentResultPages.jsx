@@ -13,22 +13,19 @@ export function PaymentSuccess() {
 
   useEffect(() => {
     const paymentId = searchParams.get('payment_id')
-    const mpPaymentId = searchParams.get('payment_id') // MP también lo manda como collection_id
-    const collectionId = searchParams.get('collection_id')
-    const mpStatus = searchParams.get('collection_status') || searchParams.get('status')
-    const plan = searchParams.get('plan')
+    const preapprovalId = searchParams.get('preapproval_id')
+    const mpStatus = searchParams.get('status')
 
     if (!paymentId) {
       setStatus('error')
       return
     }
 
-    // Confirmar el pago con el backend
+    // Confirmar la suscripcion con el backend
     paymentsAPI.confirm({
       payment_id: paymentId,
-      mp_payment_id: collectionId || mpPaymentId,
-      mp_status: mpStatus,
-      plan,
+      preapproval_id: preapprovalId,
+      status: mpStatus,
     })
       .then(() => {
         setStatus('confirmed')

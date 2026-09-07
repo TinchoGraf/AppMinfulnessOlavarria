@@ -31,8 +31,10 @@ class Settings(BaseSettings):
     MAX_AUDIO_SIZE_MB: int = 50
 
     # Planes de suscripción (en pesos argentinos)
+    # Valores de ejemplo — Martin los va a definir más adelante.
     PRICE_MONTHLY_ARS: float = 2990.0
-    PRICE_YEARLY_ARS: float = 24900.0
+    PRICE_QUARTERLY_ARS: float = 7990.0
+    PRICE_YEARLY_ARS: float = 29900.0  # equivale a 10 meses (2 meses gratis)
     FREE_TRIAL_DAYS: int = 7
 
     # ─── MercadoPago ──────────────────────────────────────────────────────────
