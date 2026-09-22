@@ -26,6 +26,7 @@ from app.schemas.content import (
     ContentItemResponse, UserStats
 )
 from app.api.deps import get_current_active_user
+from app.services.progress import is_session_completed, is_session_locked
 
 # ─── Programas ────────────────────────────────────────────────────────────────
 programs_router = APIRouter(prefix="/programs", tags=["Programas"])
@@ -65,20 +66,17 @@ def get_program(
 
     sessions = []
     for session in program.sessions:
-        completed = bool(
-            db.query(UserProgress).filter(
-                UserProgress.user_id == current_user.id,
-                UserProgress.program_session_id == session.id,
-                UserProgress.completed == True
-            ).first()
-        )
+        completed = is_session_completed(db, current_user.id, session.id)
+        locked = is_session_locked(db, current_user.id, session)
         sessions.append(ProgramSessionResponse(
             id=session.id,
             day_number=session.day_number,
             title=session.title,
             description=session.description,
             duration_minutes=session.duration_minutes,
+            content_item_id=session.content_item_id,
             is_completed=completed,
+            is_locked=locked,
         ))
 
     base = _build_program_response(program, current_user, db)
@@ -92,7 +90,7 @@ def complete_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Marca una sesión de programa como completada."""
+    """Marca una sesión de programa como completada (90% del video, o botón "Marcar como visto")."""
     session = db.query(ProgramSession).filter(
         ProgramSession.id == session_id,
         ProgramSession.program_id == program_id
@@ -100,16 +98,28 @@ def complete_session(
     if not session:
         raise HTTPException(status_code=404, detail="Sesión no encontrada")
 
+    if is_session_locked(db, current_user.id, session):
+        raise HTTPException(
+            status_code=403,
+            detail="Completá la clase anterior para desbloquear"
+        )
+
     existing = db.query(UserProgress).filter(
         UserProgress.user_id == current_user.id,
         UserProgress.program_session_id == session_id
     ).first()
 
-    if not existing:
+    if existing:
+        if not existing.completed:
+            existing.completed = True
+            existing.completed_at = datetime.utcnow()
+            db.commit()
+    else:
         prog = UserProgress(
             user_id=current_user.id,
             program_id=program_id,
             program_session_id=session_id,
+            content_item_id=session.content_item_id,
             completed=True,
             completed_at=datetime.utcnow(),
         )

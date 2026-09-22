@@ -54,6 +54,15 @@ class Settings(BaseSettings):
     # URL del webhook (donde MercadoPago notifica pagos confirmados)
     MP_WEBHOOK_URL: str = "http://localhost:8000/api/v1/payments/webhook"
 
+    # ─── Backblaze B2 (videos privados) ──────────────────────────────────────
+    # Bucket PRIVADO — nunca lo publiques como público en Backblaze.
+    # Las credenciales reales van en el archivo .env (NO en este archivo)
+    B2_KEY_ID: str = ""
+    B2_APPLICATION_KEY: str = ""
+    B2_BUCKET_NAME: str = "serenalma-videos"
+    B2_REGION: str = "us-east-005"
+    B2_VIDEO_URL_EXPIRE_SECONDS: int = 3600  # 1 hora
+
     class Config:
         env_file = ".env"
         case_sensitive = True

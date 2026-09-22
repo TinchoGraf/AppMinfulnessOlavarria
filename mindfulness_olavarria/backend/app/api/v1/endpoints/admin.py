@@ -28,6 +28,7 @@ from app.models.models import (
     Program, ProgramSession, Subscription
 )
 from app.api.deps import get_current_admin
+from app.services import b2_storage
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -150,6 +151,7 @@ def list_all_content(
             "is_active": i.is_active,
             "duration_seconds": i.duration_seconds,
             "audio_file": i.audio_file,
+            "video_file": i.video_file,
             "plays_count": i.plays_count,
             "order": i.order,
             "body_text": i.body_text,
@@ -240,6 +242,46 @@ async def upload_audio(
     db.commit()
 
     return {"message": "Audio subido", "filename": filename, "url": f"/media/{filename}"}
+
+
+@router.post("/content/{item_id}/video")
+async def upload_video(
+    item_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin)
+):
+    """
+    Sube un video mp4 al bucket PRIVADO de Backblaze B2 y lo asocia al ítem.
+    El archivo nunca queda accesible públicamente: solo se sirve a través
+    de GET /api/v1/media/video/{item_id}, que exige suscripción premium.
+    """
+    item = db.query(ContentItem).filter(ContentItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Contenido no encontrado")
+
+    allowed = ["video/mp4"]
+    if file.content_type not in allowed:
+        raise HTTPException(status_code=400, detail="Solo se permiten archivos .mp4")
+
+    filename = f"{uuid.uuid4().hex}.mp4"
+
+    try:
+        b2_storage.upload_video(file.file, filename, content_type=file.content_type)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Error subiendo el video a Backblaze: {e}")
+
+    # Si había un video anterior, eliminarlo del bucket
+    if item.video_file:
+        try:
+            b2_storage.delete_video(item.video_file)
+        except Exception:
+            pass
+
+    item.video_file = filename
+    db.commit()
+
+    return {"message": "Video subido", "filename": filename}
 
 
 # ─── Categorías ───────────────────────────────────────────────────────────────

@@ -5,11 +5,49 @@ El navegador necesita Range requests para poder reproducir audio
 """
 
 import os
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
 from app.core.config import settings
+from app.db.database import get_db
+from app.models.models import ContentItem, ProgramSession
+from app.api.deps import get_premium_user
+from app.services import b2_storage
+from app.services.progress import is_session_locked
 
 router = APIRouter(prefix="/media", tags=["Media"])
+
+
+@router.get("/video/{item_id}")
+async def get_signed_video_url(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_premium_user),
+):
+    """
+    Genera una URL firmada temporal (1 hora) para reproducir el video de un
+    ítem de contenido. Requiere suscripción premium activa — get_premium_user
+    ya devuelve 402 si el usuario no la tiene.
+
+    Si el video pertenece a una sesión de un Program (curso con desbloqueo
+    progresivo), también se valida que la sesión anterior ya esté completada.
+    """
+    item = db.query(ContentItem).filter(ContentItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Contenido no encontrado")
+
+    session = db.query(ProgramSession).filter(ProgramSession.content_item_id == item_id).first()
+    if session and is_session_locked(db, current_user.id, session):
+        raise HTTPException(
+            status_code=403,
+            detail="Completá la clase anterior para desbloquear"
+        )
+
+    if not item.video_file:
+        raise HTTPException(status_code=404, detail="Este contenido no tiene video")
+
+    url = b2_storage.generate_signed_video_url(item.video_file)
+    return {"video_url": url, "expires_in": settings.B2_VIDEO_URL_EXPIRE_SECONDS}
 
 
 @router.get("/audio/{filename}")

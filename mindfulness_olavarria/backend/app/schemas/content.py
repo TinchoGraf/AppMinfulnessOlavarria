@@ -68,7 +68,9 @@ class ProgramSessionResponse(BaseModel):
     title: str
     description: Optional[str] = None
     duration_minutes: Optional[int] = None
+    content_item_id: Optional[int] = None
     is_completed: bool = False
+    is_locked: bool = False
 
     class Config:
         from_attributes = True

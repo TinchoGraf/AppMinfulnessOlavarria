@@ -38,6 +38,11 @@ export const statsAPI = {
   me: () => client.get('/stats/me'),
 }
 
+// ─── Media ────────────────────────────────────────────────────────────────────
+export const mediaAPI = {
+  videoUrl: (itemId) => client.get(`/media/video/${itemId}`),
+}
+
 // ─── Pagos ────────────────────────────────────────────────────────────────────
 export const paymentsAPI = {
   createSubscription: (plan) => client.post('/payments/create-subscription', { plan }),

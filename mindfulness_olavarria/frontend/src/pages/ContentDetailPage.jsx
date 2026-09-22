@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { contentAPI } from '../api/api'
+import { contentAPI, mediaAPI } from '../api/api'
 import useAuthStore from '../store/authStore'
 import BreathingPlayer from '../components/BreathingPlayer'
 
@@ -92,6 +92,8 @@ export default function ContentDetailPage() {
           <AudioPlayer item={item} />
         ) : item.content_type === 'breathing' ? (
           <BreathingPlayer techniqueKey="4-7-8" itemId={item.id} />
+        ) : item.content_type === 'video' ? (
+          <VideoPlayer item={item} />
         ) : (item.content_type === 'exercise' || item.content_type === 'text') ? (
           <TextContent item={item} />
         ) : (
@@ -272,6 +274,71 @@ function AudioPlayer({ item }) {
           )}
         </>
       )}
+    </div>
+  )
+}
+
+
+// ─── Reproductor de Video ─────────────────────────────────────────────────────
+
+function VideoPlayer({ item }) {
+  const [videoUrl, setVideoUrl] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    mediaAPI.videoUrl(item.id)
+      .then((r) => setVideoUrl(r.data.video_url))
+      .catch((err) => {
+        if (err.response?.status === 402) {
+          setError('premium')
+        } else if (err.response?.status === 404) {
+          setError('not_found')
+        } else {
+          setError('generic')
+        }
+      })
+      .finally(() => setLoading(false))
+  }, [item.id])
+
+  const handleEnded = () => {
+    contentAPI.saveProgress(item.id, { progress_seconds: Math.floor(item.duration_seconds || 0), completed: true })
+  }
+
+  if (loading) {
+    return (
+      <div style={{ background: 'white', borderRadius: '16px', padding: '24px', border: '0.5px solid var(--border)', textAlign: 'center' }}>
+        <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>Cargando video...</p>
+      </div>
+    )
+  }
+
+  if (error === 'premium') return <Paywall />
+
+  if (error) {
+    return (
+      <div style={{ background: 'white', borderRadius: '16px', padding: '24px', border: '0.5px solid var(--border)', textAlign: 'center' }}>
+        <p style={{ fontSize: '32px', marginBottom: '8px' }}>🎥</p>
+        <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+          {error === 'not_found'
+            ? 'El video de este contenido aún no fue subido.'
+            : 'No se pudo cargar el video. Probá de nuevo más tarde.'}
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ background: 'white', borderRadius: '16px', padding: '12px', border: '0.5px solid var(--border)' }}>
+      <video
+        src={videoUrl}
+        controls
+        preload="metadata"
+        onEnded={handleEnded}
+        style={{ width: '100%', borderRadius: '10px', display: 'block' }}
+      />
     </div>
   )
 }

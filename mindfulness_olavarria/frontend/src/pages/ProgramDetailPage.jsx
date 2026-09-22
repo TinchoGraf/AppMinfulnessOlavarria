@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { programsAPI } from '../api/api'
+import { programsAPI, mediaAPI } from '../api/api'
 
 export default function ProgramDetailPage() {
   const { id } = useParams()
@@ -9,6 +9,7 @@ export default function ProgramDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [completing, setCompleting] = useState(null)
+  const [activeSession, setActiveSession] = useState(null)
 
   const load = () => {
     programsAPI.detail(id)
@@ -32,6 +33,17 @@ export default function ProgramDetailPage() {
       load() // Recargar para actualizar progreso
     } catch {}
     setCompleting(null)
+  }
+
+  const openSession = (session) => {
+    if (session.is_locked) return
+    if (session.content_item_id) {
+      // Sesión con video: abrir el reproductor
+      setActiveSession(session)
+    } else {
+      // Sesión sin video (formato viejo): comportamiento anterior
+      handleComplete(session.id)
+    }
   }
 
   if (loading) return <LoadingScreen />
@@ -165,7 +177,7 @@ export default function ProgramDetailPage() {
                 )}
               </div>
               <button
-                onClick={() => handleComplete(nextSession.id)}
+                onClick={() => openSession(nextSession)}
                 disabled={completing === nextSession.id}
                 style={{
                   padding: '9px 16px', background: 'var(--green-500)',
@@ -193,8 +205,7 @@ export default function ProgramDetailPage() {
               key={session.id}
               session={session}
               isLast={i === program.sessions.length - 1}
-              onComplete={() => handleComplete(session.id)}
-              completing={completing === session.id}
+              onOpen={() => openSession(session)}
             />
           ))}
 
@@ -225,6 +236,15 @@ export default function ProgramDetailPage() {
           </div>
         )}
       </div>
+
+      {activeSession && (
+        <VideoSessionModal
+          programId={id}
+          session={activeSession}
+          onCompleted={load}
+          onClose={() => { setActiveSession(null); load() }}
+        />
+      )}
     </div>
   )
 }
@@ -232,85 +252,183 @@ export default function ProgramDetailPage() {
 
 // ─── Fila de sesión ───────────────────────────────────────────────────────────
 
-function SessionRow({ session, isLast, onComplete, completing }) {
-  const [expanded, setExpanded] = useState(false)
+function SessionRow({ session, isLast, onOpen }) {
+  const status = session.is_completed ? 'completed' : session.is_locked ? 'locked' : 'available'
+  const icon = status === 'completed' ? '✅' : status === 'locked' ? '🔒' : '▶'
 
   return (
     <div style={{ borderBottom: isLast ? 'none' : '0.5px solid var(--border)' }}>
       <div
         style={{
           display: 'flex', alignItems: 'center', gap: '12px',
-          padding: '14px 16px', cursor: 'pointer',
+          padding: '14px 16px',
+          cursor: status === 'locked' ? 'default' : 'pointer',
+          opacity: status === 'locked' ? 0.6 : 1,
         }}
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => onOpen()}
       >
         {/* Indicador de día */}
         <div style={{
           width: '40px', height: '40px', borderRadius: '10px', flexShrink: 0,
-          background: session.is_completed ? 'var(--green-50)' : 'var(--bg-tertiary)',
+          background: status === 'completed' ? 'var(--green-50)' : 'var(--bg-tertiary)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: session.is_completed ? '20px' : '14px',
+          fontSize: '18px',
           fontWeight: '600',
-          color: session.is_completed ? 'var(--green-500)' : 'var(--text-secondary)',
+          color: status === 'completed' ? 'var(--green-500)' : 'var(--text-secondary)',
         }}>
-          {session.is_completed ? '✅' : session.day_number}
+          {icon}
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{
             fontSize: '14px', fontWeight: '500',
-            color: session.is_completed ? 'var(--text-secondary)' : 'var(--text-primary)',
-            textDecoration: session.is_completed ? 'line-through' : 'none',
+            color: status === 'completed' ? 'var(--text-secondary)' : 'var(--text-primary)',
+            textDecoration: status === 'completed' ? 'line-through' : 'none',
           }}>
             Día {session.day_number} — {session.title}
           </p>
-          {session.duration_minutes && (
+          {status === 'locked' ? (
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+              🔒 Completá la clase anterior para desbloquear
+            </p>
+          ) : session.duration_minutes ? (
             <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
               ⏱️ {session.duration_minutes} min
             </p>
-          )}
+          ) : null}
         </div>
 
-        <span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-          {expanded ? '▲' : '▼'}
-        </span>
+        {status !== 'locked' && (
+          <span style={{ color: 'var(--text-muted)', fontSize: '16px' }}>›</span>
+        )}
       </div>
+    </div>
+  )
+}
 
-      {/* Detalle expandible */}
-      {expanded && (
-        <div style={{
-          padding: '0 16px 16px 68px',
-          borderTop: '0.5px solid var(--border)',
-          paddingTop: '12px',
-        }}>
-          {session.description && (
-            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '12px' }}>
-              {session.description}
-            </p>
-          )}
 
-          {!session.is_completed && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onComplete() }}
-              disabled={completing}
-              style={{
-                padding: '9px 20px',
-                background: 'var(--green-500)', color: 'white',
-                border: 'none', borderRadius: '8px',
-                fontSize: '13px', fontWeight: '500', cursor: 'pointer',
-              }}
-            >
-              {completing ? 'Guardando...' : '✅ Marcar como completada'}
-            </button>
-          )}
+// ─── Modal de video con desbloqueo progresivo ─────────────────────────────────
 
-          {session.is_completed && (
-            <p style={{ fontSize: '13px', color: 'var(--green-700)', fontWeight: '500' }}>
-              ✅ Sesión completada
-            </p>
-          )}
+function VideoSessionModal({ programId, session, onCompleted, onClose }) {
+  const [videoUrl, setVideoUrl] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [justCompleted, setJustCompleted] = useState(session.is_completed)
+  const [marking, setMarking] = useState(false)
+  const completedRef = useRef(session.is_completed)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    mediaAPI.videoUrl(session.content_item_id)
+      .then((r) => setVideoUrl(r.data.video_url))
+      .catch((err) => {
+        const status = err.response?.status
+        if (status === 402) setError('premium')
+        else if (status === 403) setError('locked')
+        else if (status === 404) setError('not_found')
+        else setError('generic')
+      })
+      .finally(() => setLoading(false))
+  }, [session.content_item_id])
+
+  const markComplete = async () => {
+    if (completedRef.current) return
+    completedRef.current = true
+    setMarking(true)
+    try {
+      await programsAPI.completeSession(programId, session.id)
+      setJustCompleted(true)
+      onCompleted() // refresca la lista para desbloquear la siguiente sesión
+    } catch {
+      completedRef.current = false
+    }
+    setMarking(false)
+  }
+
+  const handleTimeUpdate = (e) => {
+    const video = e.target
+    if (!video.duration) return
+    if (video.currentTime / video.duration >= 0.9) {
+      markComplete()
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '20px', zIndex: 100,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: 'white', borderRadius: '16px', padding: '16px',
+          maxWidth: '480px', width: '100%', maxHeight: '90vh', overflowY: 'auto',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '12px' }}>
+          <p style={{ fontSize: '15px', fontWeight: '600', lineHeight: '1.4' }}>
+            Día {session.day_number} — {session.title}
+          </p>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', flexShrink: 0 }}
+          >
+            ✕
+          </button>
         </div>
-      )}
+
+        {loading && (
+          <p style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-secondary)', fontSize: '14px' }}>
+            Cargando video...
+          </p>
+        )}
+
+        {!loading && error && (
+          <p style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-secondary)', fontSize: '14px' }}>
+            {error === 'premium' && '🔒 Necesitás suscripción premium para ver este video.'}
+            {error === 'locked' && '🔒 Completá la clase anterior para desbloquear esta.'}
+            {error === 'not_found' && 'El video de esta clase aún no fue subido.'}
+            {error === 'generic' && 'No se pudo cargar el video. Probá de nuevo más tarde.'}
+          </p>
+        )}
+
+        {!loading && videoUrl && (
+          <>
+            <video
+              src={videoUrl}
+              controls
+              preload="metadata"
+              onTimeUpdate={handleTimeUpdate}
+              onEnded={markComplete}
+              style={{ width: '100%', borderRadius: '10px', display: 'block' }}
+            />
+
+            {justCompleted ? (
+              <p style={{ marginTop: '12px', textAlign: 'center', fontSize: '13px', color: 'var(--green-700)', fontWeight: '500' }}>
+                ✅ Clase completada
+              </p>
+            ) : (
+              <button
+                onClick={markComplete}
+                disabled={marking}
+                style={{
+                  marginTop: '12px', width: '100%', padding: '11px',
+                  background: 'var(--green-500)', color: 'white',
+                  border: 'none', borderRadius: '8px',
+                  fontSize: '14px', fontWeight: '500', cursor: 'pointer',
+                }}
+              >
+                {marking ? 'Guardando...' : '✅ Marcar como visto'}
+              </button>
+            )}
+          </>
+        )}
+      </div>
     </div>
   )
 }

@@ -146,6 +146,7 @@ class ContentItem(Base):
 
     # Archivo / contenido
     audio_file = Column(String(500), nullable=True)     # Path relativo al archivo
+    video_file = Column(String(500), nullable=True)     # Nombre del archivo en el bucket de Backblaze B2
     duration_seconds = Column(Integer, nullable=True)    # Duración del audio
     body_text = Column(Text, nullable=True)              # Para ejercicios de texto
     thumbnail = Column(String(500), nullable=True)       # Imagen de portada
