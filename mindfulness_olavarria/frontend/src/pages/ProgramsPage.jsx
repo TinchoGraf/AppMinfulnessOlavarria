@@ -32,7 +32,7 @@ export default function ProgramsPage() {
             <p style={{ color: 'var(--text-secondary)' }}>Los programas están en camino</p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div className="card-grid card-grid-lg">
             {programs.map((program) => (
               <ProgramCard key={program.id} program={program} onClick={() => navigate(`/programas/${program.id}`)} />
             ))}

@@ -111,7 +111,7 @@ export default function ContentPage() {
             {freeItems.length > 0 && (
               <div style={{ marginBottom: '24px' }}>
                 <p className="section-label">Gratis</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '0.5px solid var(--border)' }}>
+                <div className="content-list">
                   {freeItems.map((item) => (
                     <ContentRow key={item.id} item={item} onClick={() => navigate(`/contenido/${item.id}`)} />
                   ))}
@@ -129,7 +129,7 @@ export default function ContentPage() {
                   </span>
                   <div style={{ flex: 1, height: '0.5px', background: 'var(--border)' }} />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: 'var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '0.5px solid var(--border)', opacity: 0.8 }}>
+                <div className="content-list" style={{ opacity: 0.8 }}>
                   {premiumItems.map((item) => (
                     <ContentRow key={item.id} item={item} onClick={() => navigate(`/contenido/${item.id}`)} />
                   ))}
@@ -181,13 +181,13 @@ function ContentRow({ item, onClick }) {
   return (
     <button
       onClick={onClick}
+      className="content-row"
       style={{
         display: 'flex',
         alignItems: 'center',
         gap: '12px',
         padding: '12px 14px',
         background: 'white',
-        border: 'none',
         width: '100%',
         textAlign: 'left',
       }}

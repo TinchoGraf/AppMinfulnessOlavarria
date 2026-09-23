@@ -134,8 +134,10 @@ export default function ProgramDetailPage() {
         </div>
       </div>
 
-      <div style={{ padding: '20px', maxWidth: '480px', margin: '0 auto' }}>
+      <div className="program-detail-body">
 
+        {/* Columna izquierda (desktop): info del programa */}
+        <div>
         {/* Descripción */}
         {program.description && (
           <div className="card" style={{ marginBottom: '20px' }}>
@@ -192,6 +194,10 @@ export default function ProgramDetailPage() {
           </div>
         )}
 
+        </div>
+
+        {/* Columna derecha (desktop): sesiones */}
+        <div>
         {/* Lista de todas las sesiones */}
         <p className="section-label">Todas las sesiones</p>
         <div style={{
@@ -235,6 +241,7 @@ export default function ProgramDetailPage() {
             </p>
           </div>
         )}
+        </div>
       </div>
 
       {activeSession && (
@@ -364,9 +371,10 @@ function VideoSessionModal({ programId, session, onCompleted, onClose }) {
       onClick={onClose}
     >
       <div
+        className="video-modal"
         style={{
           background: 'white', borderRadius: '16px', padding: '16px',
-          maxWidth: '480px', width: '100%', maxHeight: '90vh', overflowY: 'auto',
+          maxHeight: '90vh', overflowY: 'auto',
         }}
         onClick={(e) => e.stopPropagation()}
       >

@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import Sidebar from './Sidebar'
 
 const navItems = [
   { to: '/', label: 'Inicio', icon: '🏠' },
@@ -7,28 +8,19 @@ const navItems = [
   { to: '/perfil', label: 'Perfil', icon: '👤' },
 ]
 
+// Mobile: nav inferior. Desktop (≥ 768px): Sidebar. El cambio lo hacen las
+// media queries de index.css (.app-shell, .bottom-nav, .sidebar).
 export default function Layout() {
   return (
-    <div style={{ maxWidth: '480px', margin: '0 auto', minHeight: '100vh', position: 'relative', background: 'var(--bg-secondary)' }}>
-      <main style={{ paddingBottom: '72px' }}>
+    <div className="app-shell">
+      <Sidebar navItems={navItems} />
+
+      <main className="app-main">
         <Outlet />
       </main>
 
       {/* Nav inferior */}
-      <nav style={{
-        position: 'fixed',
-        bottom: 0,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: '100%',
-        maxWidth: '480px',
-        background: 'white',
-        borderTop: '0.5px solid var(--border)',
-        display: 'flex',
-        justifyContent: 'space-around',
-        padding: '8px 0 12px',
-        zIndex: 100,
-      }}>
+      <nav className="bottom-nav">
         {navItems.map(({ to, label, icon }) => (
           <NavLink
             key={to}

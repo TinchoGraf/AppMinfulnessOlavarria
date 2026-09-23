@@ -27,7 +27,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div>
+    <div className="profile-page">
       <div style={{ background: 'white', padding: '24px 16px 16px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
         <div style={{
           width: '64px', height: '64px',

@@ -89,7 +89,7 @@ export default function HomePage() {
           <p style={{ fontSize: '15px', fontWeight: '500', color: 'var(--green-900)', marginBottom: '12px' }}>
             ¿Cómo te sentís hoy?
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+          <div className="emotion-grid">
             {EMOTIONS.map((emotion) => (
               <button
                 key={emotion.key}
@@ -125,7 +125,7 @@ export default function HomePage() {
             {loadingRec ? (
               <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Buscando...</p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div className="card-grid">
                 {recommendations.slice(0, 3).map((item) => (
                   <ContentCard key={item.id} item={item} onClick={() => navigate(`/contenido/${item.id}`)} />
                 ))}
@@ -172,7 +172,7 @@ export default function HomePage() {
         {featured.length > 0 && (
           <div>
             <p className="section-label">Destacado</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div className="card-grid">
               {featured.slice(0, 4).map((item) => (
                 <ContentCard key={item.id} item={item} onClick={() => navigate(`/contenido/${item.id}`)} />
               ))}
