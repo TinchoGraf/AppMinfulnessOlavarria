@@ -32,6 +32,7 @@ export const adminAPI = {
     client.delete(`/admin/programs/${programId}/sessions/${sessionId}`),
 
   // Cuestionarios y registros de los cursos
+  programSessions: (programId) => client.get(`/admin/programs/${programId}/sessions`),
   sessionQuiz: (sessionId) => client.get(`/admin/sessions/${sessionId}/quiz`),
   createQuiz: (sessionId, data) => client.post(`/admin/sessions/${sessionId}/quiz`, data),
   updateQuiz: (quizId, data) => client.put(`/admin/quiz/${quizId}`, data),

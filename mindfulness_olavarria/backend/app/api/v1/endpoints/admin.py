@@ -12,6 +12,7 @@ GET  /admin/programs           → Lista programas
 POST /admin/programs           → Crear programa
 PUT  /admin/programs/{id}      → Editar programa
 POST /admin/programs/{id}/sessions → Agregar sesión
+GET  /admin/programs/{id}/sessions → Sesiones con el resumen de su cuestionario
 GET  /admin/sessions/{id}/quiz     → Ver el cuestionario de una sesión (con correctas)
 POST /admin/sessions/{id}/quiz     → Crear cuestionario con preguntas y opciones
 PUT  /admin/quiz/{id}              → Editar cuestionario
@@ -434,12 +435,22 @@ def _build_questions(questions: List[QuizQuestionIn]) -> list[QuizQuestion]:
     ]
 
 
-def _serialize_quiz(quiz: Quiz) -> dict:
+def _count_responses(db: Session, quiz_id: int) -> int:
+    """Cantidad de usuarios que respondieron el cuestionario."""
+    return (
+        db.query(func.count(func.distinct(QuizResponse.user_id)))
+        .filter(QuizResponse.quiz_id == quiz_id)
+        .scalar()
+    )
+
+
+def _serialize_quiz(db: Session, quiz: Quiz) -> dict:
     return {
         "id": quiz.id,
         "program_session_id": quiz.program_session_id,
         "title": quiz.title,
         "is_active": quiz.is_active,
+        "response_count": _count_responses(db, quiz.id),
         "questions": [
             {
                 "id": q.id,
@@ -455,6 +466,31 @@ def _serialize_quiz(quiz: Quiz) -> dict:
     }
 
 
+@router.get("/programs/{program_id}/sessions")
+def list_program_sessions(
+    program_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin)
+):
+    """Sesiones del programa (por día) con el resumen de su cuestionario, si tiene."""
+    program = _get_program_or_404(db, program_id)
+    return [
+        {
+            "id": s.id,
+            "day_number": s.day_number,
+            "title": s.title,
+            "quiz": {
+                "id": s.quiz.id,
+                "title": s.quiz.title,
+                "is_active": s.quiz.is_active,
+                "question_count": len(s.quiz.questions),
+                "response_count": _count_responses(db, s.quiz.id),
+            } if s.quiz else None,
+        }
+        for s in program.sessions
+    ]
+
+
 @router.get("/sessions/{session_id}/quiz")
 def get_session_quiz_admin(
     session_id: int,
@@ -464,7 +500,7 @@ def get_session_quiz_admin(
     quiz = db.query(Quiz).filter(Quiz.program_session_id == session_id).first()
     if not quiz:
         raise HTTPException(status_code=404, detail="Esta sesión no tiene cuestionario")
-    return _serialize_quiz(quiz)
+    return _serialize_quiz(db, quiz)
 
 
 @router.post("/sessions/{session_id}/quiz", status_code=201)
@@ -490,7 +526,7 @@ def create_session_quiz(
     db.add(quiz)
     db.commit()
     db.refresh(quiz)
-    return _serialize_quiz(quiz)
+    return _serialize_quiz(db, quiz)
 
 
 @router.put("/quiz/{quiz_id}")
@@ -525,7 +561,7 @@ def update_quiz(
 
     db.commit()
     db.refresh(quiz)
-    return _serialize_quiz(quiz)
+    return _serialize_quiz(db, quiz)
 
 
 # ─── Respuestas y registros de los usuarios ───────────────────────────────────

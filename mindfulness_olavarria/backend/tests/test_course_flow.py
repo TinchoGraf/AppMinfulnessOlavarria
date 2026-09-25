@@ -260,3 +260,21 @@ def test_admin_sees_responses_and_activities(client, program):
     assert [a["content"] for a in activities] == ["Registro de Ana"]
     assert activities[0]["user_name"] == "Ana Test"
     assert activities[0]["session_title"] == "Clase 1"
+
+
+def test_admin_lists_sessions_with_quiz_summary(client, program):
+    s1 = program.sessions[0]
+    quiz = create_quiz(client, s1.id)
+
+    sessions = client.get(f"{API}/admin/programs/{program.id}/sessions").json()
+    assert [s["day_number"] for s in sessions] == [1, 2, 3]
+    assert sessions[0]["quiz"] == {
+        "id": quiz["id"], "title": "Repaso clase 1", "is_active": True,
+        "question_count": 2, "response_count": 0,
+    }
+    assert sessions[1]["quiz"] is None
+
+    complete_video(client, program, s1)
+    answers = [{"question_id": x["id"], "option_id": x["options"][0]["id"]} for x in quiz["questions"]]
+    client.post(f"{base(program, s1)}/quiz/respond", json={"answers": answers})
+    assert client.get(f"{API}/admin/sessions/{s1.id}/quiz").json()["response_count"] == 1
