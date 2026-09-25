@@ -7,6 +7,7 @@ const navItems = [
   { to: '/admin/contenido', label: 'Contenido', icon: '🎵' },
   { to: '/admin/programas', label: 'Programas', icon: '📚' },
   { to: '/admin/usuarios', label: 'Usuarios', icon: '👥' },
+  { to: '/admin/respuestas-cursos', label: 'Respuestas de cursos', icon: '📊' },
 ]
 
 export default function AdminLayout() {

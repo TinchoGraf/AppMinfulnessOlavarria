@@ -24,6 +24,16 @@ export const programsAPI = {
   detail: (id) => client.get(`/programs/${id}`),
   completeSession: (programId, sessionId) =>
     client.post(`/programs/${programId}/sessions/${sessionId}/complete`),
+  quiz: (programId, sessionId) =>
+    client.get(`/programs/${programId}/sessions/${sessionId}/quiz`),
+  respondQuiz: (programId, sessionId, answers) =>
+    client.post(`/programs/${programId}/sessions/${sessionId}/quiz/respond`, { answers }),
+  quizResult: (programId, sessionId) =>
+    client.get(`/programs/${programId}/sessions/${sessionId}/quiz/result`),
+  activities: (programId, sessionId) =>
+    client.get(`/programs/${programId}/sessions/${sessionId}/activity`),
+  addActivity: (programId, sessionId, content) =>
+    client.post(`/programs/${programId}/sessions/${sessionId}/activity`, { content }),
 }
 
 // ─── Emocional ────────────────────────────────────────────────────────────────

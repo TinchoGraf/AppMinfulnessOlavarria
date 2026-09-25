@@ -30,4 +30,11 @@ export const adminAPI = {
   addSession: (programId, data) => client.post(`/admin/programs/${programId}/sessions`, data),
   deleteSession: (programId, sessionId) =>
     client.delete(`/admin/programs/${programId}/sessions/${sessionId}`),
+
+  // Cuestionarios y registros de los cursos
+  sessionQuiz: (sessionId) => client.get(`/admin/sessions/${sessionId}/quiz`),
+  createQuiz: (sessionId, data) => client.post(`/admin/sessions/${sessionId}/quiz`, data),
+  updateQuiz: (quizId, data) => client.put(`/admin/quiz/${quizId}`, data),
+  programResponses: (programId) => client.get(`/admin/programs/${programId}/responses`),
+  programActivities: (programId) => client.get(`/admin/programs/${programId}/activities`),
 }

@@ -18,6 +18,7 @@ import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminContent from './pages/admin/AdminContent'
 import AdminPrograms from './pages/admin/AdminPrograms'
 import AdminUsers from './pages/admin/AdminUsers'
+import AdminCourseResponses from './pages/admin/AdminCourseResponses'
 
 function PrivateRoute({ children }) {
   const token = useAuthStore((s) => s.token)
@@ -79,6 +80,7 @@ export default function App() {
           <Route path="contenido" element={<AdminContent />} />
           <Route path="programas" element={<AdminPrograms />} />
           <Route path="usuarios" element={<AdminUsers />} />
+          <Route path="respuestas-cursos" element={<AdminCourseResponses />} />
         </Route>
 
         {/* App principal */}
