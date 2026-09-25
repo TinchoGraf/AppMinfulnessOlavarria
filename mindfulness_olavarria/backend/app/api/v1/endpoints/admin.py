@@ -12,20 +12,26 @@ GET  /admin/programs           → Lista programas
 POST /admin/programs           → Crear programa
 PUT  /admin/programs/{id}      → Editar programa
 POST /admin/programs/{id}/sessions → Agregar sesión
+GET  /admin/sessions/{id}/quiz     → Ver el cuestionario de una sesión (con correctas)
+POST /admin/sessions/{id}/quiz     → Crear cuestionario con preguntas y opciones
+PUT  /admin/quiz/{id}              → Editar cuestionario
+GET  /admin/programs/{id}/responses  → Respuestas de todos los usuarios a los cuestionarios
+GET  /admin/programs/{id}/activities → Registros emocionales de todos los usuarios
 """
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from typing import Optional
-from pydantic import BaseModel
+from typing import Optional, List
+from pydantic import BaseModel, Field
 import os, shutil, uuid
 
 from app.db.database import get_db
 from app.core.config import settings
 from app.models.models import (
     User, ContentItem, ContentType, Category,
-    Program, ProgramSession, Subscription
+    Program, ProgramSession, Subscription,
+    Quiz, QuizQuestion, QuizOption, QuizResponse, ActivityLog,
 )
 from app.api.deps import get_current_admin
 from app.services import b2_storage
@@ -79,6 +85,30 @@ class SessionCreate(BaseModel):
     description: Optional[str] = None
     content_item_id: Optional[int] = None
     duration_minutes: Optional[int] = None
+
+
+class QuizOptionIn(BaseModel):
+    option_text: str = Field(..., min_length=1)
+    is_correct: bool = False
+    order: int = 0
+
+
+class QuizQuestionIn(BaseModel):
+    question_text: str = Field(..., min_length=1)
+    order: int = 0
+    options: List[QuizOptionIn]
+
+
+class QuizCreate(BaseModel):
+    title: str = Field(..., min_length=1)
+    is_active: bool = True
+    questions: List[QuizQuestionIn] = Field(..., min_length=1)
+
+
+class QuizUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1)
+    is_active: Optional[bool] = None
+    questions: Optional[List[QuizQuestionIn]] = Field(None, min_length=1)
 
 
 # ─── Stats generales ──────────────────────────────────────────────────────────
@@ -381,3 +411,211 @@ def delete_session(
     db.delete(session)
     db.commit()
     return {"message": "Sesión eliminada"}
+
+
+# ─── Cuestionarios ────────────────────────────────────────────────────────────
+
+def _validate_questions(questions: List[QuizQuestionIn]):
+    for i, q in enumerate(questions, start=1):
+        if len(q.options) < 2:
+            raise HTTPException(status_code=400, detail=f"La pregunta {i} necesita al menos 2 opciones")
+        if sum(o.is_correct for o in q.options) != 1:
+            raise HTTPException(status_code=400, detail=f"La pregunta {i} debe tener exactamente una opción correcta")
+
+
+def _build_questions(questions: List[QuizQuestionIn]) -> list[QuizQuestion]:
+    return [
+        QuizQuestion(
+            question_text=q.question_text,
+            order=q.order,
+            options=[QuizOption(**o.model_dump()) for o in q.options],
+        )
+        for q in questions
+    ]
+
+
+def _serialize_quiz(quiz: Quiz) -> dict:
+    return {
+        "id": quiz.id,
+        "program_session_id": quiz.program_session_id,
+        "title": quiz.title,
+        "is_active": quiz.is_active,
+        "questions": [
+            {
+                "id": q.id,
+                "question_text": q.question_text,
+                "order": q.order,
+                "options": [
+                    {"id": o.id, "option_text": o.option_text, "is_correct": o.is_correct, "order": o.order}
+                    for o in q.options
+                ],
+            }
+            for q in quiz.questions
+        ],
+    }
+
+
+@router.get("/sessions/{session_id}/quiz")
+def get_session_quiz_admin(
+    session_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin)
+):
+    quiz = db.query(Quiz).filter(Quiz.program_session_id == session_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Esta sesión no tiene cuestionario")
+    return _serialize_quiz(quiz)
+
+
+@router.post("/sessions/{session_id}/quiz", status_code=201)
+def create_session_quiz(
+    session_id: int,
+    data: QuizCreate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin)
+):
+    session = db.query(ProgramSession).filter(ProgramSession.id == session_id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
+    if db.query(Quiz).filter(Quiz.program_session_id == session_id).first():
+        raise HTTPException(status_code=409, detail="La sesión ya tiene un cuestionario; editalo con PUT /admin/quiz/{id}")
+    _validate_questions(data.questions)
+
+    quiz = Quiz(
+        program_session_id=session_id,
+        title=data.title,
+        is_active=data.is_active,
+        questions=_build_questions(data.questions),
+    )
+    db.add(quiz)
+    db.commit()
+    db.refresh(quiz)
+    return _serialize_quiz(quiz)
+
+
+@router.put("/quiz/{quiz_id}")
+def update_quiz(
+    quiz_id: int,
+    data: QuizUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin)
+):
+    """
+    Edita título/estado. Si se envían `questions`, reemplaza todas las preguntas
+    y opciones; eso solo se permite si nadie respondió todavía el cuestionario.
+    """
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Cuestionario no encontrado")
+
+    if data.questions is not None:
+        has_responses = db.query(QuizResponse).filter(QuizResponse.quiz_id == quiz_id).first()
+        if has_responses:
+            raise HTTPException(
+                status_code=409,
+                detail="El cuestionario ya tiene respuestas: solo se puede editar el título y si está activo",
+            )
+        _validate_questions(data.questions)
+        quiz.questions = _build_questions(data.questions)
+
+    if data.title is not None:
+        quiz.title = data.title
+    if data.is_active is not None:
+        quiz.is_active = data.is_active
+
+    db.commit()
+    db.refresh(quiz)
+    return _serialize_quiz(quiz)
+
+
+# ─── Respuestas y registros de los usuarios ───────────────────────────────────
+
+def _get_program_or_404(db: Session, program_id: int) -> Program:
+    program = db.query(Program).filter(Program.id == program_id).first()
+    if not program:
+        raise HTTPException(status_code=404, detail="Programa no encontrado")
+    return program
+
+
+@router.get("/programs/{program_id}/responses")
+def list_program_quiz_responses(
+    program_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin)
+):
+    """Respuestas a los cuestionarios del programa, una entrada por (usuario, sesión)."""
+    _get_program_or_404(db, program_id)
+    rows = (
+        db.query(QuizResponse)
+        .join(Quiz, Quiz.id == QuizResponse.quiz_id)
+        .join(ProgramSession, ProgramSession.id == Quiz.program_session_id)
+        .filter(ProgramSession.program_id == program_id)
+        .order_by(ProgramSession.day_number, QuizResponse.user_id)
+        .all()
+    )
+
+    grouped: dict[tuple[int, int], dict] = {}
+    for r in rows:
+        quiz = r.question.quiz
+        session = quiz.program_session
+        key = (r.user_id, session.id)
+        if key not in grouped:
+            grouped[key] = {
+                "user_id": r.user_id,
+                "user_name": r.user.full_name,
+                "user_email": r.user.email,
+                "session_id": session.id,
+                "day_number": session.day_number,
+                "session_title": session.title,
+                "quiz_id": quiz.id,
+                "quiz_title": quiz.title,
+                "answered_at": r.answered_at,
+                "score": 0,
+                "total": len(quiz.questions),
+                "answers": [],
+            }
+        entry = grouped[key]
+        entry["answered_at"] = max(entry["answered_at"], r.answered_at)
+        entry["score"] += int(bool(r.option.is_correct))
+        entry["answers"].append({
+            "question_id": r.question_id,
+            "question_order": r.question.order,
+            "question_text": r.question.question_text,
+            "option_text": r.option.option_text,
+            "is_correct": bool(r.option.is_correct),
+        })
+
+    for entry in grouped.values():
+        entry["answers"].sort(key=lambda a: (a["question_order"], a["question_id"]))
+    return list(grouped.values())
+
+
+@router.get("/programs/{program_id}/activities")
+def list_program_activities(
+    program_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_admin)
+):
+    """Registros emocionales de todos los usuarios en las sesiones del programa."""
+    _get_program_or_404(db, program_id)
+    rows = (
+        db.query(ActivityLog)
+        .join(ProgramSession, ProgramSession.id == ActivityLog.program_session_id)
+        .filter(ProgramSession.program_id == program_id)
+        .order_by(ProgramSession.day_number, ActivityLog.logged_at.desc())
+        .all()
+    )
+    return [
+        {
+            "id": a.id,
+            "user_id": a.user_id,
+            "user_name": a.user.full_name,
+            "user_email": a.user.email,
+            "session_id": a.program_session_id,
+            "day_number": a.program_session.day_number,
+            "session_title": a.program_session.title,
+            "content": a.content,
+            "logged_at": a.logged_at,
+        }
+        for a in rows
+    ]

@@ -5,6 +5,12 @@ GET  /programs/              → Lista programas
 GET  /programs/{id}          → Detalle con sesiones
 POST /programs/{id}/enroll   → Inscribirse a un programa
 
+GET  /programs/{id}/sessions/{sid}/quiz          → Cuestionario (sin respuestas correctas)
+POST /programs/{id}/sessions/{sid}/quiz/respond  → Enviar respuestas
+GET  /programs/{id}/sessions/{sid}/quiz/result   → Resultado del usuario
+POST /programs/{id}/sessions/{sid}/activity      → Nueva entrada de registro emocional
+GET  /programs/{id}/sessions/{sid}/activity      → Entradas del usuario en la sesión
+
 POST /emotional/log          → Registrar estado emocional del día
 GET  /emotional/history      → Historial emocional del usuario
 GET  /emotional/recommend    → Recomendaciones según estado actual
@@ -18,15 +24,21 @@ from datetime import datetime, timedelta
 from app.db.database import get_db
 from app.models.models import (
     Program, ProgramSession, UserProgress,
-    EmotionalLog, ContentItem, User
+    EmotionalLog, ContentItem, User,
+    QuizResponse, ActivityLog,
 )
 from app.schemas.content import (
     ProgramResponse, ProgramDetail, ProgramSessionResponse,
     EmotionalLogCreate, EmotionalLogResponse,
-    ContentItemResponse, UserStats
+    ContentItemResponse, UserStats,
+    QuizPublic, QuizSubmit, QuizResult, QuizAnswerResult,
+    ActivityLogCreate, ActivityLogCreated, ActivityLogList,
 )
 from app.api.deps import get_current_active_user
-from app.services.progress import is_session_completed, is_session_locked
+from app.services.progress import (
+    is_session_completed, is_session_locked, is_video_completed,
+    get_session_progress, get_active_quiz, get_session_steps,
+)
 
 # ─── Programas ────────────────────────────────────────────────────────────────
 programs_router = APIRouter(prefix="/programs", tags=["Programas"])
@@ -66,8 +78,6 @@ def get_program(
 
     sessions = []
     for session in program.sessions:
-        completed = is_session_completed(db, current_user.id, session.id)
-        locked = is_session_locked(db, current_user.id, session)
         sessions.append(ProgramSessionResponse(
             id=session.id,
             day_number=session.day_number,
@@ -75,8 +85,7 @@ def get_program(
             description=session.description,
             duration_minutes=session.duration_minutes,
             content_item_id=session.content_item_id,
-            is_completed=completed,
-            is_locked=locked,
+            **get_session_steps(db, current_user.id, session),
         ))
 
     base = _build_program_response(program, current_user, db)
@@ -127,6 +136,213 @@ def complete_session(
         db.commit()
 
     return {"message": f"Día {session.day_number} completado ✓"}
+
+
+# ─── Cuestionario de la sesión ────────────────────────────────────────────────
+
+def _get_accessible_session(
+    db: Session, user: User, program_id: int, session_id: int
+) -> ProgramSession:
+    """Sesión del programa, validando que exista y que el usuario tenga acceso."""
+    session = (
+        db.query(ProgramSession)
+        .join(Program, Program.id == ProgramSession.program_id)
+        .filter(
+            ProgramSession.id == session_id,
+            ProgramSession.program_id == program_id,
+            Program.is_active == True,
+        )
+        .first()
+    )
+    if not session:
+        raise HTTPException(status_code=404, detail="Sesión no encontrada")
+
+    is_premium_user = bool(user.subscription and user.subscription.is_premium)
+    if session.program.is_premium and not is_premium_user:
+        raise HTTPException(status_code=402, detail="Este programa requiere suscripción premium")
+    return session
+
+
+def _require_active_quiz(db: Session, session_id: int):
+    quiz = get_active_quiz(db, session_id)
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Esta sesión no tiene cuestionario")
+    return quiz
+
+
+def _build_quiz_result(db: Session, user_id: int, quiz) -> QuizResult | None:
+    responses = {
+        r.question_id: r
+        for r in db.query(QuizResponse).filter(
+            QuizResponse.user_id == user_id, QuizResponse.quiz_id == quiz.id
+        )
+    }
+    if not responses:
+        return None
+
+    answers = []
+    for question in quiz.questions:
+        response = responses.get(question.id)
+        if not response:
+            continue
+        correct = next((o for o in question.options if o.is_correct), None)
+        answers.append(QuizAnswerResult(
+            question_id=question.id,
+            question_text=question.question_text,
+            selected_option_id=response.option_id,
+            selected_option_text=response.option.option_text,
+            correct_option_id=correct.id if correct else None,
+            correct_option_text=correct.option_text if correct else None,
+            is_correct=bool(response.option.is_correct),
+        ))
+
+    return QuizResult(
+        quiz_id=quiz.id,
+        title=quiz.title,
+        score=sum(a.is_correct for a in answers),
+        total=len(quiz.questions),
+        answered_at=max(r.answered_at for r in responses.values()),
+        answers=answers,
+    )
+
+
+@programs_router.get("/{program_id}/sessions/{session_id}/quiz", response_model=QuizPublic)
+def get_session_quiz(
+    program_id: int,
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Cuestionario de la sesión, sin indicar las opciones correctas."""
+    _get_accessible_session(db, current_user, program_id, session_id)
+    quiz = _require_active_quiz(db, session_id)
+
+    if not is_video_completed(db, current_user.id, session_id):
+        raise HTTPException(status_code=403, detail="Completá el video para acceder al cuestionario")
+
+    progress = get_session_progress(db, current_user.id, session_id)
+    return QuizPublic(
+        id=quiz.id,
+        title=quiz.title,
+        questions=quiz.questions,
+        is_answered=bool(progress and progress.quiz_completed_at),
+    )
+
+
+@programs_router.post("/{program_id}/sessions/{session_id}/quiz/respond", response_model=QuizResult)
+def respond_session_quiz(
+    program_id: int,
+    session_id: int,
+    data: QuizSubmit,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Guarda las respuestas (una por pregunta, sin reintentos) y marca el cuestionario como completado."""
+    _get_accessible_session(db, current_user, program_id, session_id)
+    quiz = _require_active_quiz(db, session_id)
+
+    if not is_video_completed(db, current_user.id, session_id):
+        raise HTTPException(status_code=403, detail="Completá el video para acceder al cuestionario")
+
+    progress = get_session_progress(db, current_user.id, session_id)
+    already = db.query(QuizResponse).filter(
+        QuizResponse.user_id == current_user.id, QuizResponse.quiz_id == quiz.id
+    ).first()
+    if progress.quiz_completed_at or already:
+        raise HTTPException(status_code=409, detail="Ya respondiste este cuestionario")
+
+    options_by_question = {q.id: {o.id for o in q.options} for q in quiz.questions}
+    answered = [a.question_id for a in data.answers]
+    if len(answered) != len(set(answered)):
+        raise HTTPException(status_code=400, detail="Hay preguntas respondidas más de una vez")
+    if set(answered) != set(options_by_question):
+        raise HTTPException(status_code=400, detail="Respondé todas las preguntas del cuestionario")
+    for a in data.answers:
+        if a.option_id not in options_by_question[a.question_id]:
+            raise HTTPException(status_code=400, detail="Opción inválida para la pregunta")
+
+    now = datetime.utcnow()
+    for a in data.answers:
+        db.add(QuizResponse(
+            user_id=current_user.id,
+            quiz_id=quiz.id,
+            question_id=a.question_id,
+            option_id=a.option_id,
+            answered_at=now,
+        ))
+    progress.quiz_completed_at = now
+    db.commit()
+
+    return _build_quiz_result(db, current_user.id, quiz)
+
+
+@programs_router.get("/{program_id}/sessions/{session_id}/quiz/result", response_model=QuizResult)
+def get_session_quiz_result(
+    program_id: int,
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Respuestas del usuario, indicando cuáles fueron correctas."""
+    _get_accessible_session(db, current_user, program_id, session_id)
+    quiz = _require_active_quiz(db, session_id)
+
+    result = _build_quiz_result(db, current_user.id, quiz)
+    if not result:
+        raise HTTPException(status_code=404, detail="Todavía no respondiste este cuestionario")
+    return result
+
+
+# ─── Registro emocional de la sesión ──────────────────────────────────────────
+
+@programs_router.post(
+    "/{program_id}/sessions/{session_id}/activity",
+    response_model=ActivityLogCreated, status_code=201,
+)
+def create_session_activity(
+    program_id: int,
+    session_id: int,
+    data: ActivityLogCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Agrega una entrada de registro emocional. Requiere el cuestionario completado."""
+    _get_accessible_session(db, current_user, program_id, session_id)
+    _require_active_quiz(db, session_id)
+
+    progress = get_session_progress(db, current_user.id, session_id)
+    if not (progress and progress.quiz_completed_at):
+        raise HTTPException(status_code=403, detail="Completá el cuestionario para acceder al registro")
+
+    content = data.content.strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="El registro no puede estar vacío")
+
+    entry = ActivityLog(user_id=current_user.id, program_session_id=session_id, content=content)
+    db.add(entry)
+    if not progress.activity_completed_at:
+        progress.activity_completed_at = datetime.utcnow()
+    db.commit()
+    db.refresh(entry)
+    return ActivityLogCreated(entry=entry)
+
+
+@programs_router.get("/{program_id}/sessions/{session_id}/activity", response_model=ActivityLogList)
+def list_session_activity(
+    program_id: int,
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Entradas de registro emocional del usuario en esta sesión (más recientes primero)."""
+    _get_accessible_session(db, current_user, program_id, session_id)
+    entries = (
+        db.query(ActivityLog)
+        .filter(ActivityLog.user_id == current_user.id, ActivityLog.program_session_id == session_id)
+        .order_by(ActivityLog.logged_at.desc())
+        .all()
+    )
+    return ActivityLogList(entries=entries)
 
 
 # ─── Registro Emocional ───────────────────────────────────────────────────────
@@ -267,11 +483,9 @@ def get_my_stats(
 
 def _build_program_response(program: Program, user: User, db: Session) -> ProgramResponse:
     sessions_count = len(program.sessions)
-    completed_days = db.query(UserProgress).filter(
-        UserProgress.user_id == user.id,
-        UserProgress.program_id == program.id,
-        UserProgress.completed == True
-    ).count()
+    completed_days = sum(
+        is_session_completed(db, user.id, s.id) for s in program.sessions
+    )
 
     return ProgramResponse(
         id=program.id,

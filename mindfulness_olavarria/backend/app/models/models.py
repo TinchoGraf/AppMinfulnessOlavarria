@@ -10,13 +10,15 @@ Tablas:
   - program_sessions: Sesiones dentro de un programa
   - user_progress: Progreso del usuario en contenido y programas
   - emotional_logs: Registro emocional diario ("¿Cómo te sentís hoy?")
+  - quizzes / quiz_questions / quiz_options / quiz_responses: Cuestionario por sesión
+  - activity_logs: Registro emocional libre por sesión de programa
   - favorites: Contenido marcado como favorito
 """
 
 from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Boolean, Float, DateTime,
-    ForeignKey, Text, Enum as SAEnum
+    ForeignKey, Text, Enum as SAEnum, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
 import enum
@@ -205,6 +207,7 @@ class ProgramSession(Base):
     # Relaciones
     program = relationship("Program", back_populates="sessions")
     content_item = relationship("ContentItem")
+    quiz = relationship("Quiz", back_populates="program_session", uselist=False)
 
 
 class UserProgress(Base):
@@ -217,9 +220,11 @@ class UserProgress(Base):
     program_id = Column(Integer, ForeignKey("programs.id"), nullable=True)
     program_session_id = Column(Integer, ForeignKey("program_sessions.id"), nullable=True)
 
-    completed = Column(Boolean, default=False)
+    completed = Column(Boolean, default=False)      # Sesión de programa: video visto
     progress_seconds = Column(Integer, default=0)   # Segundos reproducidos
     completed_at = Column(DateTime, nullable=True)
+    quiz_completed_at = Column(DateTime, nullable=True)      # Cuestionario enviado
+    activity_completed_at = Column(DateTime, nullable=True)  # Primer registro emocional cargado
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relaciones
@@ -253,6 +258,89 @@ class Favorite(Base):
     # Relaciones
     user = relationship("User", back_populates="favorites")
     content_item = relationship("ContentItem", back_populates="favorites")
+
+
+# ─── Cuestionarios y registro por sesión ──────────────────────────────────────
+
+class Quiz(Base):
+    """Cuestionario asociado a una sesión de programa (uno por sesión)."""
+    __tablename__ = "quizzes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    program_session_id = Column(Integer, ForeignKey("program_sessions.id"), unique=True, nullable=False)
+    title = Column(String(255), nullable=False)
+    is_active = Column(Boolean, default=True)
+
+    # Relaciones
+    program_session = relationship("ProgramSession", back_populates="quiz")
+    questions = relationship(
+        "QuizQuestion", back_populates="quiz",
+        order_by="QuizQuestion.order", cascade="all, delete-orphan",
+    )
+
+
+class QuizQuestion(Base):
+    __tablename__ = "quiz_questions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    quiz_id = Column(Integer, ForeignKey("quizzes.id"), nullable=False)
+    question_text = Column(Text, nullable=False)
+    order = Column(Integer, default=0)
+
+    # Relaciones
+    quiz = relationship("Quiz", back_populates="questions")
+    options = relationship(
+        "QuizOption", back_populates="question",
+        order_by="QuizOption.order", cascade="all, delete-orphan",
+    )
+
+
+class QuizOption(Base):
+    __tablename__ = "quiz_options"
+
+    id = Column(Integer, primary_key=True, index=True)
+    question_id = Column(Integer, ForeignKey("quiz_questions.id"), nullable=False)
+    option_text = Column(Text, nullable=False)
+    is_correct = Column(Boolean, default=False)
+    order = Column(Integer, default=0)
+
+    # Relaciones
+    question = relationship("QuizQuestion", back_populates="options")
+
+
+class QuizResponse(Base):
+    """Respuesta de un usuario a una pregunta. Una sola por pregunta."""
+    __tablename__ = "quiz_responses"
+    __table_args__ = (
+        UniqueConstraint("user_id", "question_id", name="uq_quiz_response_user_question"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    quiz_id = Column(Integer, ForeignKey("quizzes.id"), nullable=False)
+    question_id = Column(Integer, ForeignKey("quiz_questions.id"), nullable=False)
+    option_id = Column(Integer, ForeignKey("quiz_options.id"), nullable=False)
+    answered_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relaciones
+    user = relationship("User")
+    question = relationship("QuizQuestion")
+    option = relationship("QuizOption")
+
+
+class ActivityLog(Base):
+    """Registro emocional libre dentro de una sesión (varias entradas por sesión)."""
+    __tablename__ = "activity_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    program_session_id = Column(Integer, ForeignKey("program_sessions.id"), nullable=False)
+    content = Column(Text, nullable=False)
+    logged_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relaciones
+    user = relationship("User")
+    program_session = relationship("ProgramSession")
 
 
 # ─── Pagos ────────────────────────────────────────────────────────────────────
